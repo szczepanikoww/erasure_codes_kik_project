@@ -57,7 +57,6 @@ def decode_raptor(encoded_symbols, N_precoded, N_original):
                 if i != missing_indices[0] and decoded_precoded[i] is not None:
                     recovered_val ^= decoded_precoded[i]
             decoded_precoded[missing_indices[0]] = recovered_val
-            print(" [Raptor] Pre-kod uratował 1 brakujący symbol!")
 
     # Sprawdzamy czy mamy oryginalną wiadomość
     original_message = decoded_precoded[:N_original]

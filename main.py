@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from time import perf_counter
 
-# Importy z naszych modułów
+# moduły projektu
 from text import text_to_binary, binary_to_text
 from encoding import encode_rs, encode_raptor
 from decoding import decode_rs, decode_raptor
@@ -22,21 +22,12 @@ def simulate_erasure_channel_raptor(encoded_symbols, drop_probability):
     return [sym for sym in encoded_symbols if random.random() >= drop_probability]
 
 def compare_codes(text, drop_rate=0.2):
-    """
-    Wyświetla czyste, techniczne statystyki z pojedynczego przejścia w konsoli.
-    """
-    print(f"\n{'='*60}")
-    print(f" SYMULACJA KANAŁU STRATNEGO (Utrata pakietów: {drop_rate*100}%) ".center(60, '='))
-    print(f"{'='*60}")
-    
     binary_data = text_to_binary(text)
     N_original = len(binary_data)
     print(f"Dane źródłowe: '{text}'")
     print(f"Długość wiadomości: {N_original} bajtów\n")
 
-    # ==============================
-    # 1. KOD REEDA-SOLOMONA
-    # ==============================
+    # Reed-Solomon
     ecc_symbols = int(N_original * 1.0)
     
     start_time = perf_counter()
@@ -47,12 +38,10 @@ def compare_codes(text, drop_rate=0.2):
     rs_lost_count = len(rs_erased_pos)
     
     start_time = perf_counter()
-    rs_decoded = decode_rs(rs_received, ecc_symbols, rs_erased_pos)
+    rs_decoded = decode_rs(rs_received, ecc_symbols, rs_erased_pos, N_original)
     rs_decode_time = (perf_counter() - start_time) * 1000
 
-    # ==============================
-    # 2. KOD RAPTOR
-    # ==============================
+    # Raptor
     overhead = 2.0
     
     start_time = perf_counter()
@@ -66,17 +55,11 @@ def compare_codes(text, drop_rate=0.2):
     raptor_decoded = decode_raptor(raptor_received, N_precoded, N_original)
     raptor_decode_time = (perf_counter() - start_time) * 1000
 
-    # ==============================
-    # TABELA PORÓWNAWCZA
-    # ==============================
-    print(f"\n{'='*60}")
-    print(" WYNIKI PORÓWNANIA ALGORYTMÓW ".center(60, '='))
-    print(f"{'='*60}")
-    
+    # tabela wynikowa    
     print(f"| {'Cecha':<20} | {'Reed-Solomon':<15} | {'Raptor (LT)':<15} |")
     print(f"|{'-'*22}|{'-'*17}|{'-'*17}|")
     
-    # Statusy bez emotikonów
+
     rs_status = "SUKCES" if rs_decoded else "PORAŻKA"
     raptor_status = "SUKCES" if raptor_decoded else "PORAŻKA"
     
@@ -105,9 +88,9 @@ def run_performance_simulation(messages, drop_rate=0.1):
         rs_enc_times.append((perf_counter() - start) * 1000)
         
         rs_received, rs_erased = simulate_erasure_channel_rs(rs_encoded, drop_rate)
-        start = perf_counter()
-        decode_rs(rs_received, ecc_symbols, rs_erased)
-        rs_dec_times.append((perf_counter() - start) * 1000)
+        start_time = perf_counter()
+        decode_rs(rs_received, ecc_symbols, rs_erased, N)
+        rs_dec_times.append((perf_counter() - start_time) * 1000)
 
         overhead = 2.0
         
@@ -139,7 +122,7 @@ def run_robustness_simulation(text, drop_rates, trials_per_rate=20):
         for _ in range(trials_per_rate):
             rs_encoded = encode_rs(binary_data, ecc_symbols)
             rs_received, rs_erased = simulate_erasure_channel_rs(rs_encoded, rate)
-            if decode_rs(rs_received, ecc_symbols, rs_erased) is not None:
+            if decode_rs(rs_received, ecc_symbols, rs_erased, N) is not None:
                 rs_successes += 1
                 
             raptor_encoded, N_precoded = encode_raptor(binary_data, overhead)
@@ -155,15 +138,21 @@ def run_robustness_simulation(text, drop_rates, trials_per_rate=20):
 
 def generate_charts():
     test_messages = [
-        "Hej", 
-        "Krotka wiadomosc tekstowa.", 
-        "To jest nieco dluzszy tekst testowy, ktory pozwoli algorytmom odrobine dluzej popracowac.",
-        "A to jest najdluzsza z przygotowanych wiadomosci. Sklada sie z wielu zdan, by przetestowac narzut obu kodow na procesor. "
+        "A" * 60,
+        "B" * 250,
+        "C" * 1000,
+        "D" * 3000
     ]
 
     lengths, rs_enc, rs_dec, rap_enc, rap_dec = run_performance_simulation(test_messages)
     drop_rates = np.linspace(0.0, 0.9, 20) 
-    rs_succ, rap_succ = run_robustness_simulation("Tekst referencyjny do testowania gubienia danych.", drop_rates)
+    rs_succ, rap_succ = run_robustness_simulation(
+        "Tekst referencyjny do testowania gubienia danych w kanale transmisyjnym o zmiennych parametrach. "
+        "Im dluzszy tekst, tym gorzej poradzi sobie tradycyjny kod blokowy typu Reed-Solomon w wersji chunked, "
+        "poniewaz wystarczy awaria jednego bloku, aby cala transmisja pliku zakonczyla sie niepowodzeniem. "
+        "Kody fontannowe (w tym Raptor) dzieki globalnej dystrybucji i braku podzialu na bloki radza sobie doskonale!", 
+        drop_rates
+    )
 
     plt.style.use('seaborn-v0_8-darkgrid')
     fig = plt.figure(figsize=(16, 10))
@@ -206,7 +195,23 @@ def generate_charts():
     plt.show()
 
 if __name__ == "__main__":
-    przykladowy_tekst = "Rozbudowane testowanie kodow z wymazywaniem w praktycznej architekturze projektowej. Sprawdzamy dzialanie!"
-    
-    compare_codes(przykladowy_tekst, drop_rate=0.51)
+    maly_tekst = "Krotka wiadomosc"
+    compare_codes(maly_tekst, drop_rate=0.20)
+
+    duzy_tekst = (
+        "Dluga wieloblokowa wiadomosc testowa sluzaca do wykazania roznic "
+        "w skalowalnosci i odpornosci obu algorytmow. "
+        "Dla duzych wiadomosci klasyczny kod Reed-Solomona musi zostac podzielony "
+        "na wiele malych blokow (chunking), co drastycznie zwieksza jego podatnosc "
+        "na losowe straty w kanale transmisyjnym - wystarczy utrata zbyt wielu symboli "
+        "w jednym bloku, aby cale dekodowanie pliku zakonczylo sie niepowodzeniem. "
+        "Z kolei kod Raptor koduje cala wiadomosc globalnie jako jeden blok. "
+        "Sprawia to, ze straty rozkladaja sie rownomiernie i prawdopodobienstwo "
+        "sukcesu dekodowania jest o wiele wyzsze. Ponadto zlozonosc obliczeniowa "
+        "kodu Raptor jest liniowa O(K), podczas gdy dla kodu Reed-Solomona rosnie kwadratowo, "
+        "co widac w czasach wykonywania operacji dla coraz wiekszych rozmiarow danych. "
+        "Dzieki temu Raptor jest nieporownywalnie szybszy dla duzych plikow."
+    )
+    compare_codes(duzy_tekst, drop_rate=0.20)
+
     generate_charts()

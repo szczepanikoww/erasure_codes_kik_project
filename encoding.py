@@ -2,50 +2,63 @@ import random
 import numpy as np
 from reedsolo import RSCodec
 
-# ==========================================
-# 1. KOD REEDA-SOLOMONA (RS)
-# ==========================================
+# Reed-Solomon
 def encode_rs(binary_data, ecc_symbols):
-    """
-    Kodowanie za pomocą algorytmu Reeda-Solomona.
-    Dodaje na końcu wiadomości `ecc_symbols` znaków nadmiarowych.
-    """
-    rs = RSCodec(ecc_symbols)
-    # rs.encode przyjmuje bytearray i zwraca bytearray (dane + nadmiarowość)
-    encoded_bytes = rs.encode(bytearray(binary_data))
-    return list(encoded_bytes)
+    block_size = 64
+    if len(binary_data) <= block_size:
+        rs = RSCodec(ecc_symbols)
+        return list(rs.encode(bytearray(binary_data)))
+        
+    ratio = ecc_symbols / len(binary_data)
+    ecc_per_block = max(1, int(block_size * ratio))
+    
+    rs = RSCodec(ecc_per_block)
+    encoded_data = []
+    for i in range(0, len(binary_data), block_size):
+        block = binary_data[i:i+block_size]
+        if len(block) < block_size:
+            block = block + [0] * (block_size - len(block))
+        encoded_data.extend(list(rs.encode(bytearray(block))))
+    return encoded_data
 
-# ==========================================
-# 2. KOD RAPTOR (Fontannowy = Pre-koder + LT)
-# ==========================================
-def soliton_distribution(N):
-    """Rozkład Solitona dla części LT kodu Raptor."""
-    p = [0] * N
-    p[0] = 1 / N
-    for i in range(2, N + 1):
-        p[i - 1] = 1 / (i * (i - 1))
-    total = sum(p)
-    return [x / total for x in p]
+# Raptor (Pre-koder + LT)
+def robust_soliton_distribution(K, c=0.2, delta=0.8):
+    # rozkład Robust Soliton dla kodów LT
+    if K == 1:
+        return [1.0]
+    rho = [0.0] * K
+    rho[0] = 1.0 / K
+    for i in range(2, K + 1):
+        rho[i - 1] = 1.0 / (i * (i - 1))
+        
+    S = c * np.log(K / delta) * np.sqrt(K)
+    if S < 1e-9:
+        S = 0.1
+    tau = [0.0] * K
+    pivot = int(np.floor(K / S))
+    pivot = max(1, min(pivot, K))
+    for i in range(1, pivot):
+        tau[i - 1] = S / (K * i)
+    if pivot - 1 < K:
+        tau[pivot - 1] = (S / K) * np.log(S / delta) if S > delta else 0.0
+        
+    total = [rho[i] + tau[i] for i in range(K)]
+    total_sum = sum(total)
+    if total_sum <= 0.0:
+        return rho
+    return [x / total_sum for x in total]
 
-def generate_raptor_symbol(data, p):
-    """Generuje pojedynczy symbol fontannowy (XOR)"""
+def generate_raptor_symbol(data, d):
+    # generowanie jednego symbolu LT (XOR) o stopniu d
     N = len(data)
-    d = np.random.choice(range(1, N + 1), p=p)
-    chosen_indices = random.sample(range(N), d)
+    chosen_indices = random.sample(range(N), int(d))
     encoded_symbol = 0
     for index in chosen_indices:
         encoded_symbol ^= data[index]
     return encoded_symbol, chosen_indices
 
 def encode_raptor(binary_data, overhead_ratio=1.5):
-    """
-    KOD RAPTOR: Składa się z 2 etapów.
-    Etap 1: Pre-kodowanie (np. dodanie globalnej parzystości XOR).
-            W komercyjnych kodach Raptor używa się skomplikowanych kodów LDPC.
-            Tutaj, dla celu edukacyjnego, tworzymy prosty blok parzystości z całej wiadomości.
-    Etap 2: Standardowe kodowanie LT na pre-kodowanych danych.
-    """
-    # ETAP 1: Pre-kodowanie (Dodajemy 1 dodatkowy symbol będący wynikiem XOR wszystkich danych)
+    # 1. Pre-kodowanie (prosty XOR wszystkich bajtów)
     parity_symbol = 0
     for b in binary_data:
         parity_symbol ^= b
@@ -53,13 +66,16 @@ def encode_raptor(binary_data, overhead_ratio=1.5):
     precoded_data = binary_data + [parity_symbol]
     N_precoded = len(precoded_data)
     
-    # ETAP 2: Generowanie fontanny (Kody LT)
-    p = soliton_distribution(N_precoded)
+    # 2. Generowanie symboli LT (fontanna)
+    p = robust_soliton_distribution(N_precoded)
     num_encoded_symbols = int(N_precoded * overhead_ratio)
     
+    # pre-generowanie stopni wszystkich symboli (ogromne przyspieszenie w numpy)
+    degrees = np.random.choice(range(1, N_precoded + 1), size=num_encoded_symbols, p=p)
+    
     encoded_symbols = []
-    for _ in range(num_encoded_symbols):
-        symbol, indices = generate_raptor_symbol(precoded_data, p)
+    for d in degrees:
+        symbol, indices = generate_raptor_symbol(precoded_data, d)
         encoded_symbols.append((symbol, indices))
         
     return encoded_symbols, N_precoded

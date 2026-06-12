@@ -196,7 +196,7 @@ def generate_charts():
 
 if __name__ == "__main__":
     maly_tekst = "Krotka wiadomosc"
-    compare_codes(maly_tekst, drop_rate=0.20)
+    compare_codes(maly_tekst, drop_rate=0.30)
 
     duzy_tekst = (
         "Dluga wieloblokowa wiadomosc testowa sluzaca do wykazania roznic "
@@ -212,6 +212,6 @@ if __name__ == "__main__":
         "co widac w czasach wykonywania operacji dla coraz wiekszych rozmiarow danych. "
         "Dzieki temu Raptor jest nieporownywalnie szybszy dla duzych plikow."
     )
-    compare_codes(duzy_tekst, drop_rate=0.20)
+    compare_codes(duzy_tekst, drop_rate=0.30)
 
     generate_charts()

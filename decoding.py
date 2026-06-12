@@ -49,22 +49,44 @@ def decode_rs(encoded_data, ecc_symbols, erase_pos, N_original=None):
 
 # Raptor (pre-kod + LT)
 def decode_raptor(encoded_symbols, N_precoded, N_original):
-    # 1. Dekodowanie LT
+    # 1. Dekodowanie LT przy użyciu zoptymalizowanego grafu i kolejki (złożoność O(K))
     decoded_precoded = [None] * N_precoded
     
-    while any(symbol is None for symbol in decoded_precoded):
-        progress = False
-        for i, (encoded_symbol, indices) in enumerate(encoded_symbols):
-            if len(indices) == 1:
-                index = indices[0]
-                if decoded_precoded[index] is None:
-                    decoded_precoded[index] = encoded_symbol
-                    progress = True
-                    for j, (es, idxs) in enumerate(encoded_symbols):
-                        if j != i and index in idxs:
-                            encoded_symbols[j] = (es ^ encoded_symbol, [idx for idx in idxs if idx != index])
-        if not progress:
-            break
+    output_values = [sym for sym, _ in encoded_symbols]
+    output_indices = [set(idxs) for _, idxs in encoded_symbols]
+    
+    source_to_outputs = [[] for _ in range(N_precoded)]
+    for out_idx, idxs in enumerate(output_indices):
+        for src_idx in idxs:
+            source_to_outputs[src_idx].append(out_idx)
+            
+    degree_one_queue = [out_idx for out_idx, idxs in enumerate(output_indices) if len(idxs) == 1]
+    
+    num_resolved = 0
+    while degree_one_queue:
+        out_idx = degree_one_queue.pop(0)
+        
+        if len(output_indices[out_idx]) != 1:
+            continue
+            
+        src_idx = next(iter(output_indices[out_idx]))
+        
+        if decoded_precoded[src_idx] is None:
+            val = output_values[out_idx]
+            decoded_precoded[src_idx] = val
+            num_resolved += 1
+            if num_resolved == N_precoded:
+                break
+                
+            for neighbor_out_idx in source_to_outputs[src_idx]:
+                if neighbor_out_idx == out_idx:
+                    continue
+                if src_idx in output_indices[neighbor_out_idx]:
+                    output_values[neighbor_out_idx] ^= val
+                    output_indices[neighbor_out_idx].remove(src_idx)
+                    
+                    if len(output_indices[neighbor_out_idx]) == 1:
+                        degree_one_queue.append(neighbor_out_idx)
 
     # 2. Dekodowanie pre-kodu (odzyskiwanie z parzystości)
     missing_indices = [i for i, x in enumerate(decoded_precoded) if x is None]

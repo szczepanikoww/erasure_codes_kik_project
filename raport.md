@@ -216,7 +216,7 @@ Dodatkowo przeprowadzono testy porównawcze dla konkretnych wiadomości przy 30%
 | Czas dekodowania | 0.578 ms | 0.057 ms | 61.645 ms | 3.716 ms |
 | Wysłane pakiety | 32 pkt | 34 pkt | 1792 pkt | 1702 pkt |
 | Utracone pakiety | 12 pkt | 8 pkt | 552 pkt | 501 pkt |
-| Status dekodowania | ✅ SUKCES | ✅ SUKCES | ✅ SUKCES | ✅ SUKCES |
+| Status dekodowania | SUKCES | SUKCES | SUKCES | SUKCES |
 
 *\*Pierwszy uruchomienie Raptora obejmuje inicjalizację rozkładu Robust Soliton, co jednorazowo wydłuża czas.*
 
@@ -366,6 +366,12 @@ W ramach realizacji projektu osiągnięto następujące cele:
 
 9. **Środowisko testowe** – stworzenie powtarzalnego, sparametryzowanego środowiska do symulacji kanału z wymazywaniem.
 
+10. **Dobór kodu FEC (Forward Error Correction) zależy bezpośrednio od skali danych i przewidywalności kanału transmisyjnego.** - skuteczność transmisji zależy od dopasowania odpowiedniej technologii do skali wyzwania.
+
+11. Dla **lokalnej precyzji** (małe bloki, znany kanał) – **Reed-Solomon** jest niezastąpiony.
+
+12. Dla **globalnej elastyczności** (duże pliki, zmienny kanał, wielu odbiorców) – **Raptor** jest zdecydowanie lepszym wyborem.
+
 ---
 
 ## 9. Wnioski
@@ -387,14 +393,6 @@ Mechanizm chunkingu, choć niezbędny dla RS przy dużych danych, wprowadza efek
 ### Wniosek 4: Optimalność MDS vs. elastyczność fontannowa
 
 Właściwość MDS kodu RS oznacza zero zmarnowanej nadmiarowości – jest to optymalny wybór, gdy każdy dodatkowy bajt jest kosztowny (np. nośniki fizyczne, pamięci NAND). Kody fontannowe oferują za to elastyczność – mogą generować dowolną liczbę symboli bez wcześniejszego ustalenia parametrów.
-
-### Podsumowanie końcowe
-
-> **Dobór kodu FEC (Forward Error Correction) zależy bezpośrednio od skali danych i przewidywalności kanału transmisyjnego. Skuteczność transmisji zależy od dopasowania odpowiedniej technologii do skali wyzwania.**
-
-Projekt potwierdził, że:
-- Dla **lokalnej precyzji** (małe bloki, znany kanał) – **Reed-Solomon** jest niezastąpiony.
-- Dla **globalnej elastyczności** (duże pliki, zmienny kanał, wielu odbiorców) – **Raptor** jest zdecydowanie lepszym wyborem.
 
 ---
 
